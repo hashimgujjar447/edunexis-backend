@@ -8,6 +8,7 @@ class AccountManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required")
+        
 
         email = self.normalize_email(email)
 
@@ -50,15 +51,14 @@ class Account(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(auto_now_add=True)
     last_login = models.DateTimeField(auto_now=True)
 
-    # 🔑 Permissions
     is_staff = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)
 
-    # 🔥 Required settings
+    
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
-    # 🔗 Manager
+    
     objects = AccountManager()
 
     def __str__(self):
@@ -80,6 +80,8 @@ class UserToken(models.Model):
     expires_at = models.DateTimeField()
 
     is_used = models.BooleanField(default=False)
+
+    
 
     def is_expired(self):
         return timezone.now() > self.expires_at
