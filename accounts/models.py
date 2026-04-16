@@ -80,6 +80,7 @@ class UserToken(models.Model):
     expires_at = models.DateTimeField()
 
     is_used = models.BooleanField(default=False)
+    attempts=models.IntegerField(default=0)
 
     
 

@@ -1,9 +1,15 @@
 from rest_framework import serializers
-from .models import Account,UserToken
+from .models import Account, UserToken
 from django.utils import timezone
-from django.shortcuts import get_object_or_404
 import hashlib
 
+
+# 🔐 helper
+def hash_token(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+# 🔐 REGISTER
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
 
@@ -11,124 +17,120 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = Account
         fields = ['id', 'email', 'password', 'first_name', 'last_name', 'role']
 
-  
     def validate_email(self, value):
-        if Account.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Email already exists")
+        value = value.lower()
+        user = Account.objects.filter(email=value).first()
+
+        if user and user.is_active:
+            raise serializers.ValidationError("Account already exists")
+
         return value
 
-  
-    def validate_password(self, value):
-        if len(value) < 8:
-            raise serializers.ValidationError("Password must be at least 8 characters")
-        return value
-
- 
     def validate_role(self, value):
         if value not in ['student', 'instructor']:
             raise serializers.ValidationError("Invalid role")
         return value
 
-   
     def create(self, validated_data):
         password = validated_data.pop("password")
 
-        user = Account(**validated_data)
-        user.set_password(password)  
+        user = Account.objects.filter(email=validated_data["email"]).first()
+
+        if user:
+            # 🔁 reuse inactive user
+            for attr, val in validated_data.items():
+                setattr(user, attr, val)
+        else:
+            user = Account(**validated_data)
+
+        user.set_password(password)
+        user.is_active = False
         user.save()
 
         return user
 
 
-
-
+# 🔑 REQUEST TOKEN (RESET / VERIFY)
 class RequestPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
     token_type = serializers.CharField()
 
-    def validate_email(self, value):
-        if not Account.objects.filter(email=value).exists():
-            raise serializers.ValidationError("No account with this email")
+    def validate(self, data):
+        email = data.get("email").lower()
+        token_type = data.get("token_type")
 
-        
+        if token_type not in ["reset_password", "email_verification"]:
+            raise serializers.ValidationError({"token_type": "Invalid token type"})
+
         active_token = UserToken.objects.filter(
-            user__email=value,
+            user__email=email,
+            token_type=token_type,
             is_used=False,
             expires_at__gt=timezone.now()
         ).exists()
 
         if active_token:
             raise serializers.ValidationError(
-                "Reset request already exists. Please check your email."
+                {"message": "Request already exists. Please check your email."}
             )
 
-        return value
-
-    def validate_token_type(self, value):
-        if value not in ["reset_password", "email_verification"]:
-            raise serializers.ValidationError("Invalid token type")
-        return value
-    
+        data["email"] = email
+        return data
 
 
-
+# 🔐 PASSWORD RESET CONFIRM
 class PasswordResetConfirmSerializer(serializers.Serializer):
-    token = serializers.CharField(required=True)
-    password = serializers.CharField(required=True, min_length=8)
-    confirm_password = serializers.CharField(required=True)
+    token = serializers.CharField()
+    password = serializers.CharField(min_length=8)
+    confirm_password = serializers.CharField()
 
-    def validate_token(self, value):
-        if not value:
-            raise serializers.ValidationError("Token is required to change password")
+    def validate(self, data):
+        raw_token = data.get("token")
+        hashed_token = hash_token(raw_token)
 
-        raw_token = str(value)
-        hashed_token = hashlib.sha256(raw_token.encode()).hexdigest()
-
-        active_request = UserToken.objects.filter(
+        token_obj = UserToken.objects.filter(
             token=hashed_token,
+            token_type="reset_password",   # 🔥 FIXED
             is_used=False
         ).first()
 
-        if not active_request:
+        if not token_obj:
             raise serializers.ValidationError(
-                "Reset request does not exist or already used"
+                {"token": "Invalid or used token"}
             )
 
-        if active_request.expires_at < timezone.now():
+        if token_obj.expires_at < timezone.now():
             raise serializers.ValidationError(
-                "Token expired, please regenerate it"
+                {"token": "Token expired"}
             )
 
-        self.context["token_obj"] = active_request
-
-        return value
-
-    def validate_password(self, value):
-        if not value:
-            raise serializers.ValidationError("Password is required")
-
-        if len(value) < 8:
+        if data.get("password") != data.get("confirm_password"):
             raise serializers.ValidationError(
-                "Password must be at least 8 characters"
+                {"confirm_password": "Passwords do not match"}
             )
 
-        return value
-
-
-    def validate_confirm_password(self, value):
-        if not value:
-            raise serializers.ValidationError("Confirm password is required")
-        return value
-
-    def validate(self, data):
-        password = data.get("password")
-        confirm_password = data.get("confirm_password")
-
-        if password != confirm_password:
-            raise serializers.ValidationError({
-                "confirm_password": "Passwords do not match"
-            })
-
-        data["token_obj"] = self.context.get("token_obj")
-
+        data["token_obj"] = token_obj
         return data
+
+
+
+class RegisterationTokenVerifySerializer(serializers.Serializer):
+    email = serializers.EmailField(
+        error_messages={
+            "required": "Email is required",
+            "invalid": "Enter a valid email address"
+        }
+    )
+    code = serializers.CharField(
+        min_length=6,
+        max_length=6,
+        error_messages={
+            "required": "Code is required",
+            "blank": "Code cannot be empty",
+            "min_length": "Code must be 6 digits",
+            "max_length": "Code must be 6 digits"
+        }
+    )
+
+    def validate_email(self, value):
+        return value.lower()
