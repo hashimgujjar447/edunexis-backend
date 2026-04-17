@@ -38,7 +38,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = Account.objects.filter(email=validated_data["email"]).first()
 
         if user:
-            # 🔁 reuse inactive user
+            
             for attr, val in validated_data.items():
                 setattr(user, attr, val)
         else:
@@ -51,7 +51,17 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-# 🔑 REQUEST TOKEN (RESET / VERIFY)
+class RequestRegisterationCodeSerializer(serializers.Serializer):
+    email=serializers.EmailField()
+    
+
+    def validate_email(self,value):
+        
+        return value.lower()
+  
+    
+
+
 class RequestPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
     token_type = serializers.CharField()

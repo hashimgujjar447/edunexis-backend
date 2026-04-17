@@ -18,7 +18,8 @@ from .serializers import (
     RegisterSerializer,
     RequestPasswordSerializer,
     PasswordResetConfirmSerializer,
-    RegisterationTokenVerifySerializer
+    RegisterationTokenVerifySerializer,
+    RequestRegisterationCodeSerializer
 )
 from .models import Account, UserToken
 from .utils import generate_secure_token, send_password_reset_token, send_verification_code
@@ -126,7 +127,7 @@ class LoginView(TokenObtainPairView):
         return response
 
 
-# 🔄 REFRESH
+
 class RefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
 
@@ -152,7 +153,7 @@ class RefreshView(TokenRefreshView):
         return Response({"access": serializer.validated_data["access"]})
 
 
-# 🚪 LOGOUT
+
 class LogoutView(APIView):
     def post(self, request):
         response = Response({"message": "Logged out successfully"})
@@ -160,7 +161,7 @@ class LogoutView(APIView):
         return response
 
 
-# 🔑 REQUEST PASSWORD RESET
+
 class RequestPasswordView(APIView):
     permission_classes = [AllowAny]
 
@@ -175,14 +176,14 @@ class RequestPasswordView(APIView):
 
         user = Account.objects.filter(email=email).first()
 
-        # 🔒 prevent email enumeration
+      
         if not user:
             return Response(
                 {"message": "If account exists, email sent"},
                 status=200
             )
 
-        # 🔥 invalidate old tokens
+       
         UserToken.objects.filter(
             user=user,
             token_type=token_type,
@@ -205,7 +206,7 @@ class RequestPasswordView(APIView):
         return Response({"message": "If account exists, email sent"}, status=200)
 
 
-# 🔐 PASSWORD RESET CONFIRM
+
 class PasswordResetConfirmView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [ResetConfirmThrottle]
@@ -274,7 +275,7 @@ class VerifyRegisterationCode(APIView):
         user = Account.objects.filter(email=email, is_active=False).first()
 
         if not user:
-            return Response({"message": "Invalid request"}, status=400)
+            return Response({"message": "No Account with email available please register"}, status=400)
 
         token = UserToken.objects.filter(
             user=user,
@@ -313,3 +314,60 @@ class VerifyRegisterationCode(APIView):
             token.save(update_fields=["is_used"])
 
         return Response({"message": "User verified successfully"})
+    
+
+class RequestVerificationCode(APIView):
+
+    permission_classes=[AllowAny]
+
+    def post(self,request):
+        serializer=RequestRegisterationCodeSerializer(data=request.data)
+        if serializer.is_valid():
+            email=serializer.validated_data["email"]
+            print(email)
+            user=Account.objects.filter(email=serializer.validated_data["email"]).first()
+            print(user)
+            if not user:
+                return Response(
+                    {"message": "If account exists, email sent"},
+                    status=200
+                )
+
+           
+            if user.is_active:
+                return Response(
+                    {"message": "Account already verified"},
+                    status=400
+                )
+           
+
+
+            token = UserToken.objects.filter(
+                user=user,
+                token_type="email_verification",
+                is_used=False,
+                expires_at__gt=timezone.now()
+            ).first()
+   
+            if token:
+                token.is_used = True
+                token.save(update_fields=["is_used"])
+            otp_code = str(random.randint(100000, 999999))
+            hashed_code=hashlib.sha256(otp_code.encode()).hexdigest()
+            expiry=timezone.now() + timedelta(minutes=15)
+
+            UserToken.objects.create(
+                user=user,
+                token=hashed_code,
+                token_type='email_verification',
+                attempts=0,
+                 expires_at=expiry
+            )
+
+
+            send_email_async(send_verification_code, user.email, otp_code)
+
+            return Response({"message":"Code send again please check your email"})
+
+        return Response(serializer.errors,status=400)    
+            
