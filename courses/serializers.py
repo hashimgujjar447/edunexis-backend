@@ -29,23 +29,49 @@ class CourseSerializer(serializers.ModelSerializer):
             "created_at"
         ]
 
-class CourseCreateSerializer(serializers.Serializer):
-    title = serializers.CharField()
-    description = serializers.CharField()
-    price = serializers.DecimalField(max_digits=8, decimal_places=2)
-    thumbnail = serializers.ImageField(required=False, allow_null=True)
-    instructors = serializers.ListField(
-        child=serializers.IntegerField(), required=False
-    )
 
-    def validate_title(self, value):
-        if not value:
-            raise serializers.ValidationError("Title is required field")
-        return value
 
-    def validate_price(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Price must be greater than 0")
-        return value
+class CourseCreateSerializer(serializers.ModelSerializer):
 
+    class Meta:
+        model = Course
+        fields = [
+            "title",
+            "description",
+            "price",
+            "discount_price",
+            "is_paid",
+            "thumbnail",
+            "instructors"
+        ]
+
+    def validate(self, data):
+        is_paid = data.get("is_paid")
+        price = data.get("price", 0)
+        discount_price = data.get("discount_price")
+
+        # Paid validation
+        if is_paid:
+            if price <= 0:
+                raise serializers.ValidationError("Paid course must have price > 0")
+
+            if discount_price:
+                if discount_price >= price:
+                    raise serializers.ValidationError(
+                        "Discount must be less than price"
+                    )
+
+        # Free validation
+        else:
+            if price != 0:
+                raise serializers.ValidationError(
+                    "Free course must have price 0"
+                )
+
+            if discount_price:
+                raise serializers.ValidationError(
+                    "Free course cannot have discount"
+                )
+
+        return data
     

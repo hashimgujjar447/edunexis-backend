@@ -8,6 +8,8 @@ from django.shortcuts import get_object_or_404
 from accounts.models import Account
 from courses.models.invite import CourseInstructorInvite
 from django.db import transaction
+from courses.models.enrollment import Enrollment
+from rest_framework import status
 
 
 class CreateCourseApiView(APIView):
@@ -36,6 +38,59 @@ class CreateCourseApiView(APIView):
 
         return Response(serializer.errors, status=400)
     
+class CourseEnrollmentApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        course_id = request.data.get("course_id")
+
+        if not course_id:
+            return Response(
+                {"error": "Course id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        course = get_object_or_404(Course, id=course_id)
+
+        
+        if request.user in course.instructors.all():
+            return Response(
+                {"error": "Instructor cannot enroll"},
+                status=400
+            )
+
+        
+        if course.is_paid:
+            return Response(
+                {"error": "This is a paid course. Complete payment first."},
+                status=status.HTTP_402_PAYMENT_REQUIRED
+            )
+
+        enrollment, created = Enrollment.objects.get_or_create(
+            user=request.user,
+            course=course
+        )
+
+        if not created:
+            return Response(
+                {"error": "You are already enrolled"},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        return Response(
+            {
+                "message": "User enrolled successfully",
+                "course_id": course.id,
+                "course_title": course.title
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+
+
+        
+
 
 class GetAllCoursesApiView(APIView):
     permission_classes = [permissions.IsAuthenticated]
