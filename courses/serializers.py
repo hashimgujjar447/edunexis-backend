@@ -91,7 +91,57 @@ class CourseSectionCreateSerializer(serializers.ModelSerializer):
         if data["order"] < 1:
             raise serializers.ValidationError("Order must be >= 1")
         return data
+    
+class LessonSerializerForSection(serializers.ModelSerializer):
+    class Meta:
+        model=Lesson
+        fields=(
+            'title','slug','order'
+        )    
 
+class AttachmentSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+    class Meta:
+        model = Attachment
+        fields = (
+            'id',
+            'file',
+            'title',
+            'file_type',
+            'created_at'
+        )
+
+    def get_file_url(self, obj):
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.file.url)
+        return obj.file.url
+
+class LessonDetailSerializer(serializers.ModelSerializer):
+    attachments = AttachmentSerializer(many=True)
+
+    class Meta:
+        model = Lesson
+        fields = (
+            'id',
+            'title',
+            'slug',
+            'order',
+            'video',        # ya video_url
+            'content',      # description / text
+            'attachments'
+        )
+
+class CourseSectionDetailSerializer(serializers.ModelSerializer):
+    course=CourseSerializer(read_only=True)
+    lessons=LessonSerializerForSection(many=True)
+    class Meta:
+        model=Section
+        fields=(
+            'title','course','order','slug','lessons'
+        )
+
+ 
 
 class SectionLessonCreateSerializer(serializers.ModelSerializer):
     section_id = serializers.IntegerField(write_only=True)
@@ -126,3 +176,4 @@ class LessonAttachmentsCreateSerializer(serializers.ModelSerializer):
             "section_id",
             "course_id",
         ]
+

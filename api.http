@@ -1,4 +1,4 @@
-@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc2NDk3MzU1LCJpYXQiOjE3NzY0OTM3NTUsImp0aSI6IjI3NjgxZWQ5ZTMxMzRhMjZhZjVlYjA0NGY3M2ZhMDc4IiwidXNlcl9pZCI6IjgifQ.CSOb4Je96astJM2sqKQIqI4PZjKkNW83gtJsBLaIHyU
+@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc2NTI4MzEwLCJpYXQiOjE3NzY1MjQ3MTAsImp0aSI6ImI4MThkM2U2MTY4NjQwY2I4YjAzOGUxNmMyZDdlZjFhIiwidXNlcl9pZCI6IjgifQ._F7t-JpL6_N-CVK5mXFpn0H8pEgaaY2WonXrH3uexQQ
 POST http://127.0.0.1:8000/api/v1/login/
 Content-Type: application/json
 
@@ -29,7 +29,13 @@ Authorization: Bearer {{token}}
 
 
 ###
-GET http://127.0.0.1:8000/api/v1/course/django-pro/
+GET http://127.0.0.1:8000/api/v1/course/first-course/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+
+###
+GET http://127.0.0.1:8000/api/v1/course/first-course/sections/
 Content-Type: application/json
 Authorization: Bearer {{token}}
 

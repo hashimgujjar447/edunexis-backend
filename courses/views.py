@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework import permissions
-from courses.serializers import CourseCreateSerializer,LessonAttachmentsCreateSerializer, CourseSerializer,CourseSectionCreateSerializer,SectionLessonCreateSerializer
+from courses.serializers import LessonDetailSerializer,CourseCreateSerializer,CourseSectionDetailSerializer,LessonAttachmentsCreateSerializer, CourseSerializer,CourseSectionCreateSerializer,SectionLessonCreateSerializer
 from courses.models.course import Course
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -126,6 +126,50 @@ class GetSingleCourseDetailApiView(APIView):
             "data": serializer.data
         })
 
+class GetCourseSectionsApiView(APIView):
+    permission_classes=[permissions.IsAuthenticated]
+    def get(self,request,slug):
+        course_sections=Section.objects.select_related("course").prefetch_related("course__instructors","lessons").filter(course__slug=slug)
+        serializer=CourseSectionDetailSerializer(course_sections,many=True)
+        return Response({
+            "message":"All course sections are",
+            "data":serializer.data
+        })
+    
+
+
+
+
+class LessonDetailApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_slug, section_slug, lesson_slug):
+
+        if not Enrollment.objects.filter(
+                    user=request.user,
+                    course=lesson.section.course
+                ).exists():
+            return Response(
+                {"message": "You are not enrolled in this course"},
+                status=403
+            )
+        lesson = get_object_or_404(
+            Lesson.objects.select_related("section__course")
+            .prefetch_related("attachments"),
+            slug=lesson_slug,
+            section__slug=section_slug,
+            section__course__slug=course_slug
+        )
+
+        serializer = LessonDetailSerializer(
+            lesson,
+            context={"request": request}
+        )
+
+        return Response({
+            "message": "Lesson detail fetched successfully",
+            "data": serializer.data
+        })
 
 class SendInstructorInvite(APIView):
     permission_classes = [permissions.IsAuthenticated]
