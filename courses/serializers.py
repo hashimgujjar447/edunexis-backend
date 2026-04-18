@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from courses.models.course import Course
-
+from courses.models.payment import Payment
+from courses.models.section import Section
 
 
 from rest_framework import serializers
@@ -33,6 +34,7 @@ class CourseSerializer(serializers.ModelSerializer):
 
 class CourseCreateSerializer(serializers.ModelSerializer):
 
+
     class Meta:
         model = Course
         fields = [
@@ -42,7 +44,7 @@ class CourseCreateSerializer(serializers.ModelSerializer):
             "discount_price",
             "is_paid",
             "thumbnail",
-            "instructors"
+           
         ]
 
     def validate(self, data):
@@ -75,3 +77,17 @@ class CourseCreateSerializer(serializers.ModelSerializer):
 
         return data
     
+
+
+class CourseSectionCreateSerializer(serializers.ModelSerializer):
+    course_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Section
+        fields = ["title", "order", "course_id"]
+
+    def validate(self, data):
+        if data["order"] < 1:
+            raise serializers.ValidationError("Order must be >= 1")
+        return data
+

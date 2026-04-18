@@ -1,0 +1,92 @@
+@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc2NDk3MzU1LCJpYXQiOjE3NzY0OTM3NTUsImp0aSI6IjI3NjgxZWQ5ZTMxMzRhMjZhZjVlYjA0NGY3M2ZhMDc4IiwidXNlcl9pZCI6IjgifQ.CSOb4Je96astJM2sqKQIqI4PZjKkNW83gtJsBLaIHyU
+POST http://127.0.0.1:8000/api/v1/login/
+Content-Type: application/json
+
+{
+   
+    "email": "demo@example.com",
+    "password": "demo"
+    
+
+}
+
+###
+POST http://127.0.0.1:8000/api/v1/course/create/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Django Pro",
+  "description": "Advanced DRF",
+  "price": 0,
+  "is_paid": false
+}
+
+###
+GET http://127.0.0.1:8000/api/v1/course/all/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+
+###
+GET http://127.0.0.1:8000/api/v1/course/django-pro/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+###
+
+POST  http://127.0.0.1:8000/api/v1/course/enroll/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "course_id":3
+}
+
+
+
+
+
+###
+POST  http://127.0.0.1:8000/api/v1/course/payment/request/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "course_id":3
+}
+
+###
+
+POST  http://127.0.0.1:8000/api/v1/course/payment/confirm/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "payment_id": 2,
+  "transaction_id": "stripe_success_2"
+}
+    
+
+
+
+
+###
+POST  http://127.0.0.1:8000/api/v1/course/invite/send/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+     "course_id":3,
+     "user_id":7
+}
+
+
+###
+POST  http://127.0.0.1:8000/api/v1/course/invite/accept/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+     "invite_id":2
+}

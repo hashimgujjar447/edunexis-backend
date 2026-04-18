@@ -25,6 +25,7 @@ class Payment(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    stripe_session_id = models.CharField(max_length=255, null=True, blank=True)
     class Meta:
         unique_together = ["user", "course"]
 

@@ -97,6 +97,7 @@ class LoginView(TokenObtainPairView):
                 status=401
             )
 
+        print(user.id)
         # 🚫 inactive user block
         if not user.is_active:
             return Response(
