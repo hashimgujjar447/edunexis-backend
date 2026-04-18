@@ -14,7 +14,7 @@ class Attachment(models.Model):
 
     title = models.CharField(max_length=255)
     file = models.FileField(upload_to="lesson_attachments/", blank=True, null=True)
-    url = models.URLField(blank=True, null=True)
+    extra_url = models.URLField(blank=True, null=True)
 
     file_type = models.CharField(max_length=20, choices=FILE_TYPES, default="other")
 

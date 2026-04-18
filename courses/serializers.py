@@ -2,7 +2,8 @@ from rest_framework import serializers
 from courses.models.course import Course
 from courses.models.payment import Payment
 from courses.models.section import Section
-
+from courses.models.lesson import Lesson
+from courses.models.attachment import Attachment
 
 from rest_framework import serializers
 from courses.models.course import Course
@@ -91,3 +92,37 @@ class CourseSectionCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Order must be >= 1")
         return data
 
+
+class SectionLessonCreateSerializer(serializers.ModelSerializer):
+    section_id = serializers.IntegerField(write_only=True)
+    course_id = serializers.IntegerField(write_only=True)
+    video = serializers.FileField()
+
+    class Meta:
+        model = Lesson
+        fields = ["title", "order", "section_id", "course_id", "video"]
+
+    def validate(self, data):
+        if data["order"] < 1:
+            raise serializers.ValidationError("Order must be >=1")
+        return data
+    
+
+class LessonAttachmentsCreateSerializer(serializers.ModelSerializer):
+    lesson_id = serializers.IntegerField(write_only=True)
+    section_id = serializers.IntegerField(write_only=True)
+    course_id = serializers.IntegerField(write_only=True)
+    file = serializers.FileField()
+    extra_url = serializers.URLField(required=False, allow_null=True)
+
+    class Meta:
+        model = Attachment
+        fields = [
+            "title",
+            "file",
+            "extra_url",
+            "file_type",
+            "lesson_id",
+            "section_id",
+            "course_id",
+        ]

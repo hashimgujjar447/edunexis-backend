@@ -8,7 +8,8 @@ class Lesson(models.Model):
     slug = models.SlugField(blank=True)
     content = models.TextField()
 
-    video_url = models.URLField(blank=True, null=True)
+ 
+    video = models.FileField(upload_to="lessons/videos/", null=True, blank=True)
     order = models.PositiveIntegerField()
 
     created_at = models.DateTimeField(auto_now_add=True)

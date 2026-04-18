@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework import permissions
-from courses.serializers import CourseCreateSerializer, CourseSerializer,CourseSectionCreateSerializer
+from courses.serializers import CourseCreateSerializer,LessonAttachmentsCreateSerializer, CourseSerializer,CourseSectionCreateSerializer,SectionLessonCreateSerializer
 from courses.models.course import Course
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -14,6 +14,9 @@ from courses.models.payment import Payment
 import stripe
 from decouple import config
 from courses.models.section import Section
+from courses.models.lesson import Lesson
+from courses.models.attachment import Attachment
+
 
 
 stripe.api_key = config("STRIPE_SECRET_KEY")
@@ -380,4 +383,85 @@ class CreateCourseSectionApiView(APIView):
         return Response({
             "message": "Section created successfully",
             "section_id": section.id
+        }, status=201)
+
+class SectionLessonCreateApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = SectionLessonCreateSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        data = serializer.validated_data
+
+        course = get_object_or_404(Course, id=data["course_id"])
+        section = get_object_or_404(Section, id=data["section_id"])
+
+        if section.course != course:
+            return Response({"message": "Invalid section for this course"}, status=400)
+
+        if request.user not in course.instructors.all():
+            return Response({"message": "Not allowed"}, status=403)
+
+        if Lesson.objects.filter(section=section, title=data["title"]).exists():
+            return Response({"message": "Title must be unique"}, status=400)
+
+        if Lesson.objects.filter(section=section, order=data["order"]).exists():
+            return Response({"message": "Order must be unique"}, status=400)
+
+        lesson = Lesson.objects.create(
+            course=course,
+            section=section,
+            title=data["title"],
+            order=data["order"],
+            video=data["video"],
+        )
+
+        return Response({
+            "message": "Lesson created successfully",
+            "lesson_id": lesson.id
+        }, status=201)
+    
+
+class LessonAttachmentApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = LessonAttachmentsCreateSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        data = serializer.validated_data
+
+        course = get_object_or_404(Course, id=data["course_id"])
+        section = get_object_or_404(Section, id=data["section_id"], course=course)
+        lesson = get_object_or_404(
+            Lesson,
+            id=data["lesson_id"],
+            course=course,
+            section=section
+        )
+
+        if request.user not in course.instructors.all():
+            return Response({"message": "Not allowed"}, status=403)
+
+        if Attachment.objects.filter(lesson=lesson, title=data["title"]).exists():
+            return Response({
+                "message": "Title must be unique per lesson"
+            }, status=400)
+
+        attachment = Attachment.objects.create(
+            file=data["file"],
+            title=data["title"],
+            lesson=lesson,
+            file_type=data["file_type"],
+            extra_url=data.get("extra_url")
+        )
+
+        return Response({
+            "message": "Lesson attachment created successfully",
+            "attachment_id": attachment.id
         }, status=201)
