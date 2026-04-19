@@ -145,3 +145,14 @@ class RegisterationTokenVerifySerializer(serializers.Serializer):
 
     def validate_email(self, value):
         return value.lower()
+    
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=Account
+        fields=(
+            'id',
+            'email',
+            'first_name',
+            'last_name'
+        )    

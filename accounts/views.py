@@ -9,7 +9,8 @@ from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny,IsAuthenticated
+from django.shortcuts import get_object_or_404
 
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .throttles import RegisterThrottle,ResetConfirmThrottle,VerifyThrottle
@@ -19,7 +20,8 @@ from .serializers import (
     RequestPasswordSerializer,
     PasswordResetConfirmSerializer,
     RegisterationTokenVerifySerializer,
-    RequestRegisterationCodeSerializer
+    RequestRegisterationCodeSerializer,
+    UserDetailSerializer
 )
 from .models import Account, UserToken
 from .utils import generate_secure_token, send_password_reset_token, send_verification_code
@@ -372,3 +374,14 @@ class RequestVerificationCode(APIView):
 
         return Response(serializer.errors,status=400)    
             
+
+class UserProfileApiView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserDetailSerializer(request.user)
+
+        return Response({
+            "message": "Profile fetched",
+            "data": serializer.data
+        })
