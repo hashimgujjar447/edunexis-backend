@@ -108,7 +108,8 @@ class AttachmentSerializer(serializers.ModelSerializer):
             'file',
             'title',
             'file_type',
-            'created_at'
+            'created_at',
+            'file_url'
         )
 
     def get_file_url(self, obj):
@@ -132,13 +133,14 @@ class LessonDetailSerializer(serializers.ModelSerializer):
             'attachments'
         )
 
+
 class CourseSectionDetailSerializer(serializers.ModelSerializer):
-    course=CourseSerializer(read_only=True)
+   
     lessons=LessonSerializerForSection(many=True)
     class Meta:
         model=Section
         fields=(
-            'title','course','order','slug','lessons'
+            'title','order','slug','lessons'
         )
 
  

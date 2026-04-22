@@ -17,6 +17,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
         fields = ['id', 'email', 'password', 'first_name', 'last_name', 'role']
+        extra_kwargs = {
+            "email": {"validators": []}  # 🔥 disable default unique validator
+        }
 
     def validate_email(self, value):
         value = value.lower()

@@ -36,31 +36,39 @@ def send_email_async(func, *args, **kwargs):
 # 🔐 REGISTER
 class RegisterView(APIView):
     permission_classes = [AllowAny]
-    throttle_classes=[RegisterThrottle]
+    throttle_classes = [RegisterThrottle]
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
 
+        # 🔴 validation (already verified user handled here)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
         email = serializer.validated_data["email"]
-        user = Account.objects.filter(email=email).first()
 
-        if user:
-            if user.is_active:
-                return Response({"message": "Account already exists"}, status=400)
-        else:
+        # 🔍 check existing user
+        existing_user = Account.objects.filter(email=email).first()
+
+        
+
+        if not existing_user:
             user = serializer.save()
+            message = "Verification code sent please verify"
 
-      
+        # 🟡 CASE 2: Unverified user → NO UPDATE, only resend
+        else:
+            user = existing_user
+            message = "Account exists, verification code resent"
+
+        # 🔥 invalidate old tokens
         UserToken.objects.filter(
             user=user,
             token_type='email_verification',
             is_used=False
         ).update(is_used=True)
 
-       
+        # 🔐 generate OTP
         otp_code = str(random.randint(100000, 999999))
         hashed_otp = hashlib.sha256(otp_code.encode()).hexdigest()
 
@@ -72,12 +80,10 @@ class RegisterView(APIView):
             attempts=0
         )
 
+        # 📩 send email
         send_email_async(send_verification_code, user.email, otp_code)
 
-        return Response(
-            {"message": "Verification code sent"},
-            status=201
-        )
+        return Response({"message": message}, status=201)
 
 
 
@@ -281,13 +287,16 @@ class VerifyRegisterationCode(APIView):
             return Response({"message": "No Account with email available please register"}, status=400)
 
         token = UserToken.objects.filter(
-            user=user,
-            token_type='email_verification',
-            is_used=False
-        ).first()
+        user=user,
+        token_type='email_verification',
+        is_used=False,
+        expires_at__gte=timezone.now()   # 🔥 ADD THIS
+    ).order_by('-created_at').first()
 
         if not token:
             return Response({"message": "Invalid code"}, status=400)
+         
+         
 
         if token.is_expired():
             return Response({"message": "Token expired"}, status=400)
@@ -346,11 +355,10 @@ class RequestVerificationCode(APIView):
 
 
             token = UserToken.objects.filter(
-                user=user,
-                token_type="email_verification",
-                is_used=False,
-                expires_at__gt=timezone.now()
-            ).first()
+    user=user,
+    token_type='email_verification',
+    is_used=False
+).order_by('-created_at').first()
    
             if token:
                 token.is_used = True

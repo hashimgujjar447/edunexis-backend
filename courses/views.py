@@ -129,10 +129,10 @@ class GetSingleCourseDetailApiView(APIView):
 class GetCourseSectionsApiView(APIView):
     permission_classes=[permissions.IsAuthenticated]
     def get(self,request,slug):
-        course_sections=Section.objects.select_related("course").prefetch_related("course__instructors","lessons").filter(course__slug=slug)
+        course_sections = Section.objects.prefetch_related("lessons").filter(course__slug=slug).order_by("order")
         serializer=CourseSectionDetailSerializer(course_sections,many=True)
         return Response({
-            "message":"All course sections are",
+            "message":"All course sections are fetched",
             "data":serializer.data
         })
     
@@ -144,6 +144,13 @@ class LessonDetailApiView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, course_slug, section_slug, lesson_slug):
+        lesson = get_object_or_404(
+            Lesson.objects.select_related("section__course")
+            .prefetch_related("attachments"),
+            slug=lesson_slug,
+            section__slug=section_slug,
+            section__course__slug=course_slug
+        )
 
         if not Enrollment.objects.filter(
                     user=request.user,
@@ -153,13 +160,7 @@ class LessonDetailApiView(APIView):
                 {"message": "You are not enrolled in this course"},
                 status=403
             )
-        lesson = get_object_or_404(
-            Lesson.objects.select_related("section__course")
-            .prefetch_related("attachments"),
-            slug=lesson_slug,
-            section__slug=section_slug,
-            section__course__slug=course_slug
-        )
+       
 
         serializer = LessonDetailSerializer(
             lesson,
