@@ -60,7 +60,7 @@ Hi,
 
 Your password reset token is:
 
-{token}
+http://localhost:3000/reset/password/{token}
 
 Expires in 10 minutes.
 """

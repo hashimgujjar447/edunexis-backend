@@ -67,14 +67,12 @@ class RequestRegisterationCodeSerializer(serializers.Serializer):
 
 class RequestPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    token_type = serializers.CharField()
 
     def validate(self, data):
         email = data.get("email").lower()
-        token_type = data.get("token_type")
 
-        if token_type not in ["reset_password", "email_verification"]:
-            raise serializers.ValidationError({"token_type": "Invalid token type"})
+        # Direct token type (same as view)
+        token_type = "reset_password"
 
         active_token = UserToken.objects.filter(
             user__email=email,

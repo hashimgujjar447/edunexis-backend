@@ -181,18 +181,18 @@ class RequestPasswordView(APIView):
             return Response(serializer.errors, status=400)
 
         email = serializer.validated_data["email"]
-        token_type = serializer.validated_data["token_type"]
+        
+        # Direct set
+        token_type = "reset_password"
 
         user = Account.objects.filter(email=email).first()
 
-      
         if not user:
             return Response(
                 {"message": "If account exists, email sent"},
                 status=200
             )
 
-       
         UserToken.objects.filter(
             user=user,
             token_type=token_type,
