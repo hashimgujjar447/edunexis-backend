@@ -10,7 +10,9 @@ from .views import (
     PaymentRequestApiView,
     PaymentConfirmApiView,
     GetCourseSectionsApiView,
-    LessonDetailApiView
+    LessonDetailApiView,
+    CreateCategoryApiView,
+    GetAllCategoriesApiView
 )
 
 urlpatterns = [
@@ -31,4 +33,6 @@ urlpatterns = [
 
     path('payment/request/', PaymentRequestApiView.as_view(), name='payment-request'),
     path('payment/confirm/', PaymentConfirmApiView.as_view(), name='payment-confirm'),
+    path("categories/create/", CreateCategoryApiView.as_view()),
+path("categories/", GetAllCategoriesApiView.as_view()),
 ]

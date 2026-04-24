@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework import permissions
-from courses.serializers import LessonDetailSerializer,CourseCreateSerializer,CourseSectionDetailSerializer,LessonAttachmentsCreateSerializer, CourseSerializer,CourseSectionCreateSerializer,SectionLessonCreateSerializer
+from courses.serializers import CategorySerializer,LessonDetailSerializer,CourseCreateSerializer,CourseSectionDetailSerializer,LessonAttachmentsCreateSerializer, CourseSerializer,CourseSectionCreateSerializer,SectionLessonCreateSerializer
 from courses.models.course import Course
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -16,10 +16,53 @@ from decouple import config
 from courses.models.section import Section
 from courses.models.lesson import Lesson
 from courses.models.attachment import Attachment
+from courses.models.course import Category
 
 
 
 stripe.api_key = config("STRIPE_SECRET_KEY")
+
+
+class CreateCategoryApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        name = request.data.get("name")
+
+        if not name:
+            return Response(
+                {"error": "Category name is required"},
+                status=400
+            )
+
+        if Category.objects.filter(name__iexact=name).exists():
+            return Response(
+                {"error": "Category already exists"},
+                status=400
+            )
+
+        category = Category.objects.create(name=name)
+
+        return Response({
+            "message": "Category created successfully",
+            "data": {
+                "id": category.id,
+                "name": category.name,
+                "slug": category.slug
+            }
+        }, status=201)
+
+class GetAllCategoriesApiView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        categories = Category.objects.all()
+        serializer = CategorySerializer(categories, many=True)
+
+        return Response({
+            "message": "Categories fetched successfully",
+            "data": serializer.data
+        })    
 
 
 class CreateCourseApiView(APIView):
@@ -30,6 +73,8 @@ class CreateCourseApiView(APIView):
 
         if serializer.is_valid():
             data = serializer.validated_data
+            category_ids = request.data.get("category_ids", [])
+            categories = Category.objects.filter(id__in=category_ids)
 
             course = Course.objects.create(
                 title=data["title"],
@@ -37,8 +82,12 @@ class CreateCourseApiView(APIView):
                 price=data["price"],
                 thumbnail=data.get("thumbnail"),
                 is_paid=data.get("is_paid", False),
-                discount_price=data.get("discount_price")
+                discount_price=data.get("discount_price"),
             )
+
+            course.categories.set(categories)
+
+            
 
             course.instructors.add(request.user)
 
@@ -102,12 +151,14 @@ class GetAllCoursesApiView(APIView):
 
     def get(self, request):
         courses = Course.objects.all().prefetch_related("instructors")
-        serializer = CourseSerializer(courses, many=True)
+        serializer = CourseSerializer(courses, many=True, context={"request": request})
 
         return Response({
             "message": "All courses fetched",
             "data": serializer.data
         })
+    
+ 
 
 
 class GetSingleCourseDetailApiView(APIView):
@@ -119,7 +170,7 @@ class GetSingleCourseDetailApiView(APIView):
             slug=slug
         )
 
-        serializer = CourseSerializer(course)
+        serializer = CourseSerializer(course,context={"request":request})
 
         return Response({
             "message": "Course fetched successfully",

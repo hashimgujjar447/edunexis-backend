@@ -8,7 +8,15 @@ from courses.models.attachment import Attachment
 from rest_framework import serializers
 from courses.models.course import Course
 from accounts.models import Account
+from courses.models.review import Review
 
+
+from courses.models.course import Category
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = "__all__"
 class InstructorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
@@ -17,6 +25,9 @@ class InstructorSerializer(serializers.ModelSerializer):
 
 class CourseSerializer(serializers.ModelSerializer):
     instructors = InstructorSerializer(many=True, read_only=True)
+    categories = CategorySerializer(many=True, read_only=True)
+    thumbnail_url = serializers.SerializerMethodField()
+    reviews_count=serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -26,12 +37,25 @@ class CourseSerializer(serializers.ModelSerializer):
             "slug",
             "description",
             "price",
-            "thumbnail",
+            "discount_price",
+            "thumbnail_url",
             "instructors",
-            "created_at"
+            "created_at",
+            "categories",
+            "reviews_count"
         ]
 
+    def get_thumbnail_url(self,obj):
+        request=self.context.get("request")
+        if obj.thumbnail:
+            if request:
+                 return request.build_absolute_uri(obj.thumbnail.url)
+            return obj.thumbnail.url 
 
+        return None
+    def get_reviews_count(self,obj):
+        return Review.objects.filter(course__id=obj.id).count()
+        
 
 class CourseCreateSerializer(serializers.ModelSerializer):
 
@@ -101,12 +125,13 @@ class LessonSerializerForSection(serializers.ModelSerializer):
 
 class AttachmentSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Attachment
         fields = (
             'id',
-            'file',
             'title',
+            'file',
             'file_type',
             'created_at',
             'file_url'
@@ -114,9 +139,19 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
     def get_file_url(self, obj):
         request = self.context.get("request")
-        if request:
-            return request.build_absolute_uri(obj.file.url)
-        return obj.file.url
+
+        # ✅ Case 1: File exists
+        if obj.file:
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+
+        # ✅ Case 2: Use external URL
+        if obj.extra_url:
+            return obj.extra_url
+
+        # ✅ Case 3: Nothing exists
+        return None
 
 class LessonDetailSerializer(serializers.ModelSerializer):
     attachments = AttachmentSerializer(many=True)

@@ -7,6 +7,7 @@ from courses.models.lesson import Lesson
 from courses.models.attachment import Attachment
 from courses.models.invite import CourseInstructorInvite
 from courses.models.payment import Payment
+from courses.models.course import Category
 
 # Register your models here.
 
@@ -19,3 +20,4 @@ admin.site.register(Lesson)
 admin.site.register(Attachment)
 admin.site.register(CourseInstructorInvite)
 admin.site.register(Payment)
+admin.site.register(Category)

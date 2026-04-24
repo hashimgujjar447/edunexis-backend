@@ -25,10 +25,10 @@ class Attachment(models.Model):
         ordering = ["-created_at"]
 
     def clean(self):
-        if not self.file and not self.url:
+        if not self.file and not self.extra_url:
             raise ValidationError("Either file or URL is required")
 
-        if self.file and self.url:
+        if self.file and self.extra_url:
             raise ValidationError("Provide either file or URL, not both")
 
     def save(self, *args, **kwargs):
