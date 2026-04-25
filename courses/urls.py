@@ -12,13 +12,20 @@ from .views import (
     GetCourseSectionsApiView,
     LessonDetailApiView,
     CreateCategoryApiView,
-    GetAllCategoriesApiView
+    GetAllCategoriesApiView,
+      CreateCourseSectionApiView,
+    SectionLessonCreateApiView,
+    LessonAttachmentApiView,
+    GetAllCoursesForInstructorApiView
 )
 
 urlpatterns = [
+      path("categories/create/", CreateCategoryApiView.as_view()),
+path("categories/", GetAllCategoriesApiView.as_view()),
     path('create/', CreateCourseApiView.as_view(), name='create-course'),
     path('enroll/', CourseEnrollmentApiView.as_view(), name='enroll-course'),
     path('all/', GetAllCoursesApiView.as_view(), name='all-courses'),
+     path('all_instructor_courses/', GetAllCoursesForInstructorApiView.as_view()),
     path('<slug:slug>/', GetSingleCourseDetailApiView.as_view(), name='course-detail'),
     path('<slug:slug>/sections/', GetCourseSectionsApiView.as_view()),
       path(
@@ -26,6 +33,14 @@ urlpatterns = [
         LessonDetailApiView.as_view(),
         name="lesson-detail"
     ),
+    # 🔥 SECTION CREATE
+path("section/create/", CreateCourseSectionApiView.as_view()),
+
+# 🔥 LESSON CREATE
+path("lesson/create/", SectionLessonCreateApiView.as_view()),
+
+# 🔥 ATTACHMENT CREATE (optional)
+path("lesson/attachment/create/", LessonAttachmentApiView.as_view()),
    
     path('invite/send/', SendInstructorInvite.as_view(), name='send-invite'),
     path('invite/accept/', AcceptInstructorInvite.as_view(), name='accept-invite'),
@@ -33,6 +48,5 @@ urlpatterns = [
 
     path('payment/request/', PaymentRequestApiView.as_view(), name='payment-request'),
     path('payment/confirm/', PaymentConfirmApiView.as_view(), name='payment-confirm'),
-    path("categories/create/", CreateCategoryApiView.as_view()),
-path("categories/", GetAllCategoriesApiView.as_view()),
+  
 ]

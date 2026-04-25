@@ -136,6 +136,7 @@ AUTH_USER_MODEL='accounts.Account'
 from datetime import timedelta
 
 REST_FRAMEWORK = {
+
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
@@ -144,7 +145,10 @@ REST_FRAMEWORK = {
     ),
      'DEFAULT_THROTTLE_RATES': {
         'anon': '5/min',
-    }
+    },
+      "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend"
+    ]
 }
 
 SIMPLE_JWT = {

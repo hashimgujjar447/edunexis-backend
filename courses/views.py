@@ -17,7 +17,8 @@ from courses.models.section import Section
 from courses.models.lesson import Lesson
 from courses.models.attachment import Attachment
 from courses.models.course import Category
-
+from django.db.models import Exists, OuterRef, Value, BooleanField, Count,Q
+from .filtere import CourseFilter
 
 
 stripe.api_key = config("STRIPE_SECRET_KEY")
@@ -55,9 +56,12 @@ class CreateCategoryApiView(APIView):
 class GetAllCategoriesApiView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    
+
     def get(self, request):
         categories = Category.objects.all()
         serializer = CategorySerializer(categories, many=True)
+        print(categories)
 
         return Response({
             "message": "Categories fetched successfully",
@@ -146,31 +150,98 @@ class CourseEnrollmentApiView(APIView):
         )
 
 
-class GetAllCoursesApiView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+
+
+
+class BaseCourseQueryMixin:
+    def get_queryset(self, request):
+        user = request.user
+
+        queryset = Course.objects.all().prefetch_related(
+            "instructors",
+            "categories"
+        ).annotate(
+            reviews_count=Count("reviews", distinct=True)
+        )
+
+        search=request.query_params.get("search")
+      
+
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) |
+                Q(description__icontains=search)
+            )
+
+      
+        if user.is_authenticated:
+            enrollment_qs = Enrollment.objects.filter(
+                course=OuterRef("pk"),
+                user=user
+            )
+         
+            queryset = queryset.annotate(
+                is_enrolled=Exists(enrollment_qs)
+            )
+        else:
+            queryset = queryset.annotate(
+                is_enrolled=Value(False, output_field=BooleanField())
+            )
+
+        filtered=CourseFilter(request.GET,queryset=queryset,request=request)    
+
+        return filtered.qs
+
+
+class GetAllCoursesApiView(BaseCourseQueryMixin, APIView):
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        courses = Course.objects.all().prefetch_related("instructors")
-        serializer = CourseSerializer(courses, many=True, context={"request": request})
+        courses = self.get_queryset(request)
+
+        serializer = CourseSerializer(
+            courses,
+            many=True,
+            context={"request": request}
+        )
 
         return Response({
             "message": "All courses fetched",
             "data": serializer.data
         })
-    
- 
 
-
-class GetSingleCourseDetailApiView(APIView):
+class GetAllCoursesForInstructorApiView(BaseCourseQueryMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        queryset = self.get_queryset(request).filter(
+            instructors=request.user
+        )
+
+        serializer = CourseSerializer(
+            queryset,
+            many=True,
+            context={"request": request}
+        )
+
+        return Response({
+            "message": "Instructor courses fetched",
+            "data": serializer.data
+        })
+
+class GetSingleCourseDetailApiView(BaseCourseQueryMixin, APIView):
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request, slug):
         course = get_object_or_404(
-            Course.objects.prefetch_related("instructors"),
+            self.get_queryset(request),
             slug=slug
         )
 
-        serializer = CourseSerializer(course,context={"request":request})
+        serializer = CourseSerializer(
+            course,
+            context={"request": request}
+        )
 
         return Response({
             "message": "Course fetched successfully",
@@ -178,7 +249,7 @@ class GetSingleCourseDetailApiView(APIView):
         })
 
 class GetCourseSectionsApiView(APIView):
-    permission_classes=[permissions.IsAuthenticated]
+    permission_classes=[permissions.AllowAny]
     def get(self,request,slug):
         course_sections = Section.objects.prefetch_related("lessons").filter(course__slug=slug).order_by("order")
         serializer=CourseSectionDetailSerializer(course_sections,many=True)
@@ -203,15 +274,18 @@ class LessonDetailApiView(APIView):
             section__course__slug=course_slug
         )
 
-        if not Enrollment.objects.filter(
-                    user=request.user,
-                    course=lesson.section.course
-                ).exists():
+        if not (
+            Enrollment.objects.filter(
+                user=request.user,
+                course=lesson.section.course
+            ).exists()
+            or request.user in lesson.section.course.instructors.all()
+        ):
             return Response(
-                {"message": "You are not enrolled in this course"},
+                {"message": "Not allowed"},
                 status=403
             )
-       
+            
 
         serializer = LessonDetailSerializer(
             lesson,
@@ -495,24 +569,40 @@ class SectionLessonCreateApiView(APIView):
         course = get_object_or_404(Course, id=data["course_id"])
         section = get_object_or_404(Section, id=data["section_id"])
 
+        # ✅ Validate section belongs to course
         if section.course != course:
-            return Response({"message": "Invalid section for this course"}, status=400)
+            return Response(
+                {"message": "Invalid section for this course"},
+                status=400
+            )
 
+        # ✅ Only instructors allowed
         if request.user not in course.instructors.all():
             return Response({"message": "Not allowed"}, status=403)
 
+        # ✅ Unique title per section
         if Lesson.objects.filter(section=section, title=data["title"]).exists():
-            return Response({"message": "Title must be unique"}, status=400)
+            return Response(
+                {"message": "Title must be unique"},
+                status=400
+            )
 
-        if Lesson.objects.filter(section=section, order=data["order"]).exists():
-            return Response({"message": "Order must be unique"}, status=400)
+        # ✅ Auto-generate order (safer than frontend)
+        last_order = (
+            Lesson.objects.filter(section=section)
+            .aggregate(max_order=Count("id"))
+        )["max_order"] or 0
 
+        order = last_order + 1
+
+        # ✅ Create lesson
         lesson = Lesson.objects.create(
-            course=course,
+          
             section=section,
             title=data["title"],
-            order=data["order"],
-            video=data["video"],
+            content=data["content"],  # ✅ REQUIRED
+            order=order,
+            video=data.get("video")   # ✅ OPTIONAL
         )
 
         return Response({
@@ -532,32 +622,77 @@ class LessonAttachmentApiView(APIView):
 
         data = serializer.validated_data
 
-        course = get_object_or_404(Course, id=data["course_id"])
-        section = get_object_or_404(Section, id=data["section_id"], course=course)
-        lesson = get_object_or_404(
-            Lesson,
-            id=data["lesson_id"],
-            course=course,
-            section=section
-        )
+        # ✅ Get lesson directly
+        lesson = get_object_or_404(Lesson, id=data["lesson_id"])
 
+        # ✅ Derive section & course automatically
+        section = lesson.section
+        course = section.course
+
+        # ✅ Permission check (only instructors)
         if request.user not in course.instructors.all():
             return Response({"message": "Not allowed"}, status=403)
 
-        if Attachment.objects.filter(lesson=lesson, title=data["title"]).exists():
-            return Response({
-                "message": "Title must be unique per lesson"
-            }, status=400)
-
-        attachment = Attachment.objects.create(
-            file=data["file"],
-            title=data["title"],
+        # ✅ Unique title per lesson
+        if Attachment.objects.filter(
             lesson=lesson,
+            title=data["title"]
+        ).exists():
+            return Response(
+                {"message": "Title must be unique per lesson"},
+                status=400
+            )
+
+        # ✅ Create attachment
+        attachment = Attachment.objects.create(
+            lesson=lesson,
+            title=data["title"],
+            file=data["file"],
             file_type=data["file_type"],
-            extra_url=data.get("extra_url")
         )
 
         return Response({
-            "message": "Lesson attachment created successfully",
+            "message": "Attachment created successfully",
             "attachment_id": attachment.id
         }, status=201)
+
+# class LessonAttachmentApiView(APIView):
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def post(self, request):
+#         serializer = LessonAttachmentsCreateSerializer(data=request.data)
+
+#         if not serializer.is_valid():
+#             return Response(serializer.errors, status=400)
+
+#         data = serializer.validated_data
+
+#         course = get_object_or_404(Course, id=data["course_id"])
+#         section = get_object_or_404(Section, id=data["section_id"], course=course)
+#         lesson = get_object_or_404(
+#             Lesson,
+#             id=data["lesson_id"],
+#             course=course,
+#             section=section
+#         )
+
+#         if request.user not in course.instructors.all():
+#             return Response({"message": "Not allowed"}, status=403)
+
+#         if Attachment.objects.filter(lesson=lesson, title=data["title"]).exists():
+#             return Response({
+#                 "message": "Title must be unique per lesson"
+#             }, status=400)
+
+#         attachment = Attachment.objects.create(
+#             file=data["file"],
+#             title=data["title"],
+#             lesson=lesson,
+#             file_type=data["file_type"],
+#             extra_url=data.get("extra_url")
+#         )
+
+#         return Response({
+#             "message": "Lesson attachment created successfully",
+#             "attachment_id": attachment.id
+#         }, status=201)

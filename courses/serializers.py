@@ -9,6 +9,7 @@ from rest_framework import serializers
 from courses.models.course import Course
 from accounts.models import Account
 from courses.models.review import Review
+from courses.models.enrollment import Enrollment
 
 
 from courses.models.course import Category
@@ -23,11 +24,16 @@ class InstructorSerializer(serializers.ModelSerializer):
         fields = ["id", "email"]
 
 
+from rest_framework import serializers
+
 class CourseSerializer(serializers.ModelSerializer):
     instructors = InstructorSerializer(many=True, read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
     thumbnail_url = serializers.SerializerMethodField()
-    reviews_count=serializers.SerializerMethodField()
+
+    
+    reviews_count = serializers.IntegerField(read_only=True)
+    is_enrolled = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Course
@@ -36,25 +42,28 @@ class CourseSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "description",
+            "is_paid",
+            
             "price",
             "discount_price",
             "thumbnail_url",
             "instructors",
             "created_at",
             "categories",
-            "reviews_count"
+            "reviews_count",
+            "is_enrolled",
         ]
 
-    def get_thumbnail_url(self,obj):
-        request=self.context.get("request")
-        if obj.thumbnail:
-            if request:
-                 return request.build_absolute_uri(obj.thumbnail.url)
-            return obj.thumbnail.url 
+    def get_thumbnail_url(self, obj):
+        request = self.context.get("request")
 
-        return None
-    def get_reviews_count(self,obj):
-        return Review.objects.filter(course__id=obj.id).count()
+        if not obj.thumbnail:
+            return None
+
+        if request:
+            return request.build_absolute_uri(obj.thumbnail.url)
+
+        return obj.thumbnail.url
         
 
 class CourseCreateSerializer(serializers.ModelSerializer):
@@ -175,7 +184,7 @@ class CourseSectionDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model=Section
         fields=(
-            'title','order','slug','lessons'
+            'title','order','slug','lessons','id'
         )
 
  
@@ -183,34 +192,51 @@ class CourseSectionDetailSerializer(serializers.ModelSerializer):
 class SectionLessonCreateSerializer(serializers.ModelSerializer):
     section_id = serializers.IntegerField(write_only=True)
     course_id = serializers.IntegerField(write_only=True)
-    video = serializers.FileField()
+    content = serializers.CharField(required=True)
+    video = serializers.FileField(required=False, allow_null=True)  # ✅ optional
 
     class Meta:
         model = Lesson
-        fields = ["title", "order", "section_id", "course_id", "video"]
+        fields = [
+            "title",
+            "content",   # ✅ ADD THIS
+           
+            "section_id",
+            "course_id",
+            "video"
+        ]
 
-    def validate(self, data):
-        if data["order"] < 1:
-            raise serializers.ValidationError("Order must be >=1")
-        return data
-    
+  
 
 class LessonAttachmentsCreateSerializer(serializers.ModelSerializer):
     lesson_id = serializers.IntegerField(write_only=True)
-    section_id = serializers.IntegerField(write_only=True)
-    course_id = serializers.IntegerField(write_only=True)
     file = serializers.FileField()
-    extra_url = serializers.URLField(required=False, allow_null=True)
 
     class Meta:
         model = Attachment
         fields = [
             "title",
             "file",
-            "extra_url",
             "file_type",
             "lesson_id",
-            "section_id",
-            "course_id",
         ]
+# class LessonAttachmentsCreateSerializer(serializers.ModelSerializer):
+#     lesson_id = serializers.IntegerField(write_only=True)
+#     section_id = serializers.IntegerField(source="section.id", read_only=True)
+#     course_id = serializers.IntegerField(source="section.course.id", read_only=True)
+
+#     file = serializers.FileField()
+#     extra_url = serializers.URLField(required=False, allow_null=True)
+
+#     class Meta:
+#         model = Attachment
+#         fields = [
+#             "title",
+#             "file",
+#             "extra_url",
+#             "file_type",
+#             "lesson_id",
+#             "section_id",
+#             "course_id",
+#         ]
 

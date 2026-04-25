@@ -1,5 +1,4 @@
-@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc2NTI4MzEwLCJpYXQiOjE3NzY1MjQ3MTAsImp0aSI6ImI4MThkM2U2MTY4NjQwY2I4YjAzOGUxNmMyZDdlZjFhIiwidXNlcl9pZCI6IjgifQ._F7t-JpL6_N-CVK5mXFpn0H8pEgaaY2WonXrH3uexQQ
-POST http://127.0.0.1:8000/api/v1/login/
+@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc3MDgzMDIyLCJpYXQiOjE3NzcwNzk0MjIsImp0aSI6IjczNmFhODk3ZjViMTQwYWVhMzdiMGE1NGM3OTQ2NDJlIiwidXNlcl9pZCI6IjgifQ.YI_bQPGnB4WeBVl2wd6XMpkj1H3naQukYqv2UgnZaaM
 Content-Type: application/json
 
 {
@@ -23,7 +22,7 @@ Authorization: Bearer {{token}}
 }
 
 ###
-GET http://127.0.0.1:8000/api/v1/course/all/
+GET http://127.0.0.1:8000/api/v1/course/all/?category=is_paid=false
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
